@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>碰撞机器人练习版</title>
+    <link rel="stylesheet" href="./styles.css">
+  </head>
+  <body>
+    <main class="app-shell">
+      <section class="game-stage" aria-label="棋盘区域">
+        <div class="stage-header">
+          <div>
+            <p class="eyebrow">Ricochet practice board</p>
+            <h1>碰撞机器人练习版</h1>
+          </div>
+          <p class="keyboard-help">1-4 选机器人，WASD / 方向键移动，Z 撤销，H 提示，S 解法</p>
+        </div>
+        <div id="board" class="board" aria-label="16乘16碰撞机器人棋盘"></div>
+      </section>
+
+      <aside class="side-panel" aria-label="控制面板">
+        <section class="panel target-panel">
+          <p class="panel-kicker">当前目标</p>
+          <div class="target-row">
+            <div id="targetBadge" class="target-badge" aria-hidden="true"></div>
+            <div>
+              <h2 id="targetText">准备中</h2>
+              <p id="statusText" class="status-text" aria-live="polite">正在生成棋盘。</p>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel stats-panel">
+          <div>
+            <span class="stat-label">步数</span>
+            <strong id="moveCount">0</strong>
+          </div>
+          <div>
+            <span class="stat-label">种子</span>
+            <strong id="seedText">0</strong>
+          </div>
+          <div>
+            <span class="stat-label">选中</span>
+            <strong id="selectedText">红</strong>
+          </div>
+        </section>
+
+        <section class="panel">
+          <p class="panel-kicker">移动</p>
+          <div class="direction-pad" aria-label="方向按钮">
+            <button class="direction-button up" data-dir="up" type="button">上</button>
+            <button class="direction-button left" data-dir="left" type="button">左</button>
+            <button class="direction-button right" data-dir="right" type="button">右</button>
+            <button class="direction-button down" data-dir="down" type="button">下</button>
+          </div>
+        </section>
+
+        <section class="panel actions-panel">
+          <button data-action="undo" type="button">撤销</button>
+          <button data-action="reset" type="button">重开</button>
+          <button data-action="new" type="button">新局</button>
+          <label class="seed-field">
+            自定种子
+            <input id="seedInput" inputmode="numeric" type="text" placeholder="例如 1024">
+          </label>
+          <button data-action="seed" type="button">套用种子</button>
+        </section>
+
+        <section class="panel solver-panel">
+          <p class="panel-kicker">求解器</p>
+          <div class="solver-actions">
+            <button data-action="hint" type="button">下一步提示</button>
+            <button data-action="solve" type="button">显示完整解</button>
+          </div>
+          <p id="solverStatus" class="solver-status" aria-live="polite">还没有计算。</p>
+          <ol id="solutionList" class="solution-list"></ol>
+        </section>
+      </aside>
+    </main>
+
+    <script type="module" src="./src/app.mjs"></script>
+  </body>
+</html>

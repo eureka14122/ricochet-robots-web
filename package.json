@@ -1,0 +1,10 @@
+{
+  "name": "ricochet-robots-web",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "python -m http.server 8000",
+    "test": "node --test ./tests/engine.test.mjs ./tests/generator.test.mjs ./tests/solver.test.mjs ./tests/renderer.test.mjs ./tests/layout.test.mjs ./tests/input.test.mjs"
+  }
+}
