@@ -93,6 +93,45 @@ test("reaching the target marks the puzzle as won", () => {
   assert.equal(result.game.status, "won");
 });
 
+test("a won game rejects further moves", () => {
+  const won = createGame({
+    board: {
+      ...makeBoard(),
+      target: { color: "red", cell: cellId(0, 0), symbol: "star" },
+    },
+    robots: {
+      red: cellId(0, 0),
+      blue: cellId(5, 5),
+      green: cellId(4, 5),
+      yellow: cellId(5, 0),
+    },
+    seed: 12,
+  });
+
+  assert.equal(won.status, "won");
+
+  const result = moveRobot(won, "blue", DIRECTIONS.left);
+
+  assert.equal(result.moved, false);
+  assert.equal(result.game, won);
+});
+
+test("createGame carries solutionDepth through to game state", () => {
+  const game = createGame({
+    board: makeBoard(),
+    robots: {
+      red: cellId(1, 0),
+      blue: cellId(5, 5),
+      green: cellId(0, 5),
+      yellow: cellId(5, 0),
+    },
+    seed: 13,
+    solutionDepth: 7,
+  });
+
+  assert.equal(game.solutionDepth, 7);
+});
+
 test("undo restores the previous robot positions and move count", () => {
   const game = createGame({
     board: makeBoard(),

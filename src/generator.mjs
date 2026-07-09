@@ -1,5 +1,5 @@
 import { solvePuzzle } from "./solver.mjs";
-import { cellId, makePrng, normalizeSeed, pick } from "./model.mjs";
+import { cellId, makePrng, normalizeSeed, pick, ROBOTS } from "./model.mjs";
 
 const SIZE = 16;
 const BASE_WALLS_H = ["2,12", "8,9"];
@@ -49,7 +49,7 @@ function buildCandidate(seed, attempt, addNoise) {
     wallsV,
     blocked,
     target: {
-      color: "red",
+      color: pick(prng, ROBOTS),
       cell: transformCell(cellId(10, 10), mirrorX, mirrorY),
       symbol: pick(prng, TARGET_SYMBOLS),
     },

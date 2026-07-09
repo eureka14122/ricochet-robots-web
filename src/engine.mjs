@@ -7,11 +7,12 @@ import {
   cellId,
 } from "./model.mjs";
 
-export function createGame({ board, robots, seed }) {
+export function createGame({ board, robots, seed, solutionDepth }) {
   const game = {
     board,
     robots: cloneRobots(robots),
     seed,
+    solutionDepth: solutionDepth ?? null,
     moveCount: 0,
     history: [],
     status: "playing",

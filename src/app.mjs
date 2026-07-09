@@ -9,7 +9,6 @@ import {
 } from "./model.mjs";
 import {
   formatMove,
-  formatSolution,
   renderBoard,
   renderSolutionList,
   targetGlyph,
@@ -26,6 +25,8 @@ const elements = {
   seedInput: document.querySelector("#seedInput"),
   solverStatus: document.querySelector("#solverStatus"),
   solutionList: document.querySelector("#solutionList"),
+  winOverlay: document.querySelector("#winOverlay"),
+  winSummary: document.querySelector("#winSummary"),
 };
 
 const state = {
@@ -47,6 +48,7 @@ function startPuzzle(seedInput) {
   state.solver = { status: "idle", mode: "hint", moves: [] };
   state.requestId += 1;
   elements.seedInput.value = String(seed);
+  dismissWin();
   render();
 }
 
@@ -70,6 +72,12 @@ function wireControls() {
     if (event.target instanceof HTMLInputElement) return;
     const handled = handleKey(event.key);
     if (handled) event.preventDefault();
+  });
+
+  elements.winOverlay?.addEventListener("click", (event) => {
+    if (event.target === elements.winOverlay || event.target.closest("[data-win-close]")) {
+      dismissWin();
+    }
   });
 }
 
@@ -122,6 +130,9 @@ function handleAction(action) {
 }
 
 function play(dir) {
+  if (state.game.status === "won") {
+    return;
+  }
   const result = moveRobot(state.game, state.selectedRobot, dir);
   if (!result.moved) {
     elements.statusText.textContent = `${ROBOT_LABELS[state.selectedRobot]}色机器人向${DIRECTION_LABELS[dir]}没有可移动空间。`;
@@ -130,6 +141,9 @@ function play(dir) {
   state.game = result.game;
   clearSolution();
   render();
+  if (state.game.status === "won") {
+    celebrateWin();
+  }
 }
 
 function clearSolution() {
@@ -198,24 +212,79 @@ function createWorker() {
 
 function render() {
   const solutionMoves = state.solver.status === "solved" ? state.solver.moves : [];
+  const previous = captureRobotRects();
   renderBoard(elements.board, {
     game: state.game,
     selectedRobot: state.selectedRobot,
     solutionMoves,
   });
+  playSlideAnimation(previous);
 
   const target = state.game.board.target;
+  const par = state.game.solutionDepth;
   elements.targetBadge.textContent = targetGlyph(target.symbol);
   elements.targetBadge.className = `target-badge badge-${target.color}`;
   elements.targetText.textContent = `${ROBOT_LABELS[target.color]}色机器人到达目标`;
-  elements.moveCount.textContent = String(state.game.moveCount);
+  elements.moveCount.textContent = par ? `${state.game.moveCount} / ${par}` : String(state.game.moveCount);
   elements.seedText.textContent = String(state.game.seed);
   elements.selectedText.textContent = ROBOT_LABELS[state.selectedRobot];
   elements.statusText.textContent = state.game.status === "won"
-    ? `抵达目标，用了 ${state.game.moveCount} 步。`
-    : "选择机器人，然后让它沿直线滑到障碍前。";
+    ? winMessage(state.game.moveCount, par)
+    : par
+      ? `选择机器人，让它沿直线滑到障碍前。最优 ${par} 步。`
+      : "选择机器人，然后让它沿直线滑到障碍前。";
 
   renderSolverPanel();
+}
+
+function captureRobotRects() {
+  const rects = new Map();
+  elements.board.querySelectorAll("[data-robot]").forEach((node) => {
+    rects.set(node.dataset.robot, node.getBoundingClientRect());
+  });
+  return rects;
+}
+
+function playSlideAnimation(previous) {
+  if (!previous.size || prefersReducedMotion()) return;
+  elements.board.querySelectorAll("[data-robot]").forEach((node) => {
+    const before = previous.get(node.dataset.robot);
+    if (!before) return;
+    const after = node.getBoundingClientRect();
+    const dx = before.left - after.left;
+    const dy = before.top - after.top;
+    if (Math.abs(dx) < 1 && Math.abs(dy) < 1) return;
+    node.animate(
+      [
+        { transform: `translate(${dx}px, ${dy}px)` },
+        { transform: "translate(0, 0)" },
+      ],
+      { duration: 190, easing: "cubic-bezier(0.22, 0.61, 0.36, 1)" },
+    );
+  });
+}
+
+function prefersReducedMotion() {
+  return window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
+}
+
+function winMessage(steps, par) {
+  if (!par) return `抵达目标，用了 ${steps} 步。`;
+  if (steps <= par) return `完美！${steps} 步达成最优解。`;
+  return `抵达目标，用了 ${steps} 步（最优 ${par} 步）。`;
+}
+
+function celebrateWin() {
+  const overlay = elements.winOverlay;
+  if (!overlay) return;
+  const par = state.game.solutionDepth;
+  const steps = state.game.moveCount;
+  elements.winSummary.textContent = winMessage(steps, par);
+  overlay.classList.add("show");
+}
+
+function dismissWin() {
+  elements.winOverlay?.classList.remove("show");
 }
 
 function renderSolverPanel() {

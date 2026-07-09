@@ -33,7 +33,7 @@
 
         <section class="panel stats-panel">
           <div>
-            <span class="stat-label">步数</span>
+            <span class="stat-label">步数 / 最优</span>
             <strong id="moveCount">0</strong>
           </div>
           <div>
@@ -78,6 +78,18 @@
         </section>
       </aside>
     </main>
+
+    <div id="winOverlay" class="win-overlay" role="dialog" aria-modal="true" aria-labelledby="winTitle">
+      <div class="win-card">
+        <div class="win-badge" aria-hidden="true">🏆</div>
+        <h2 id="winTitle">目标达成</h2>
+        <p id="winSummary" class="win-summary"></p>
+        <div class="win-actions">
+          <button data-action="new" type="button" class="win-primary">下一局</button>
+          <button data-win-close type="button" class="win-ghost">留在此局</button>
+        </div>
+      </div>
+    </div>
 
     <script type="module" src="./src/app.mjs"></script>
   </body>
