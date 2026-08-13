@@ -28,6 +28,15 @@ test("motion and interaction states include accessibility fallbacks", () => {
   assert.match(html, /data-action="redo"[^>]*disabled/);
   assert.match(html, /aria-live="polite"/);
   assert.match(html, /id="historyList"/);
+  assert.match(html, /id="boardLoading"[^>]*role="status"/);
+  assert.match(css, /\.board-loading\s*\{/);
+});
+
+test("puzzle generation runs off the UI thread", () => {
+  const app = readFileSync(new URL("../src/app.mjs", import.meta.url), "utf8");
+  const worker = readFileSync(new URL("../src/generator.worker.mjs", import.meta.url), "utf8");
+  assert.match(app, /new Worker\(new URL\("\.\/generator\.worker\.mjs"/);
+  assert.match(worker, /generatePuzzle\(seed\)/);
 });
 
 test("board renderer builds trusted DOM nodes instead of injecting HTML", () => {

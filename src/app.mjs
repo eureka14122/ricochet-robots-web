@@ -50,6 +50,7 @@ const elements = {
   resetButton: document.querySelector('[data-action="reset"]'),
   historySummary: document.querySelector("#historySummary"),
   historyList: document.querySelector("#historyList"),
+  boardLoading: document.querySelector("#boardLoading"),
 };
 
 const state = {
@@ -57,6 +58,9 @@ const state = {
   solver: { status: "idle", mode: "hint", moves: [] },
   worker: createWorker(),
   requestId: 0,
+  generator: null,
+  generationId: 0,
+  generating: false,
 };
 
 wireControls();
@@ -73,10 +77,9 @@ function startFromLocation({ restoreSession = false } = {}) {
 }
 
 function startPuzzle(seed, { urlMode = "push", restoreSession = false } = {}) {
-  const puzzle = generatePuzzle(seed);
-  state.timeline = restoreSession
-    ? restoreGameHistory(puzzle, readStoredHistory(seed)) ?? createGameHistory(puzzle)
-    : createGameHistory(puzzle);
+  const id = state.generationId + 1;
+  state.generationId = id;
+  state.generating = true;
   state.solver = { status: "idle", mode: "hint", moves: [] };
   state.requestId += 1;
   elements.seedInput.value = String(seed);
@@ -85,7 +88,22 @@ function startPuzzle(seed, { urlMode = "push", restoreSession = false } = {}) {
     const url = createPuzzleUrl(window.location.href, seed);
     window.history[urlMode === "replace" ? "replaceState" : "pushState"]({ seed }, "", url);
   }
-  render();
+  setGenerating(true);
+
+  state.generator?.terminate();
+  state.generator = createGeneratorWorker();
+  if (state.generator) {
+    state.generator.postMessage({ id, seed, restoreSession });
+    return;
+  }
+
+  window.setTimeout(() => {
+    try {
+      receiveGeneratedPuzzle(id, generatePuzzle(seed), restoreSession);
+    } catch (error) {
+      receiveGenerationError(id, error instanceof Error ? error.message : String(error));
+    }
+  }, 0);
 }
 
 function wireControls() {
@@ -173,6 +191,7 @@ function wireBoardGestures() {
 }
 
 function handleKey(event) {
+  if (state.generating || !state.timeline) return false;
   const command = getKeyCommand(event);
   if (command.type === "select") {
     state.timeline = reduceGameHistory(state.timeline, { type: "select", robot: command.robot });
@@ -191,6 +210,8 @@ function handleKey(event) {
 }
 
 async function handleAction(action) {
+  if (state.generating) return;
+  if (!state.timeline && action !== "new" && action !== "seed") return;
   if (action === "undo" || action === "redo") {
     transitionHistory(action);
     clearSolution();
@@ -202,7 +223,7 @@ async function handleAction(action) {
     return;
   }
   if (action === "new") {
-    startPuzzle(createRandomSeed(state.timeline.game.seed));
+    startPuzzle(createRandomSeed(state.timeline?.game.seed));
     return;
   }
   if (action === "seed") {
@@ -230,6 +251,7 @@ async function handleAction(action) {
 }
 
 function play(dir) {
+  if (state.generating || !state.timeline) return;
   const game = state.timeline.game;
   if (game.status === "won") {
     return;
@@ -245,6 +267,59 @@ function play(dir) {
   if (state.timeline.game.status === "won") {
     celebrateWin();
   }
+}
+
+function createGeneratorWorker() {
+  if (!("Worker" in window)) return null;
+  try {
+    const worker = new Worker(new URL("./generator.worker.mjs", import.meta.url), { type: "module" });
+    worker.addEventListener("message", (event) => {
+      if (event.data.error) {
+        receiveGenerationError(event.data.id, event.data.error);
+        return;
+      }
+      receiveGeneratedPuzzle(event.data.id, event.data.puzzle, event.data.restoreSession);
+    });
+    worker.addEventListener("error", () => {
+      receiveGenerationError(state.generationId, "棋盘生成器加载失败，请刷新后重试。");
+    });
+    return worker;
+  } catch {
+    return null;
+  }
+}
+
+function receiveGeneratedPuzzle(id, puzzle, restoreSession) {
+  if (id !== state.generationId) return;
+  state.timeline = restoreSession
+    ? restoreGameHistory(puzzle, readStoredHistory(puzzle.seed)) ?? createGameHistory(puzzle)
+    : createGameHistory(puzzle);
+  state.generating = false;
+  setGenerating(false);
+  render();
+}
+
+function receiveGenerationError(id, message) {
+  if (id !== state.generationId) return;
+  state.generating = false;
+  elements.boardLoading.textContent = message;
+  elements.boardLoading.dataset.error = "true";
+  elements.boardLoading.hidden = false;
+  elements.board.setAttribute("aria-busy", "false");
+  elements.seedInput.disabled = false;
+  document.querySelector('[data-action="seed"]').disabled = false;
+  document.querySelector('[data-action="new"]').disabled = false;
+}
+
+function setGenerating(isGenerating) {
+  elements.board.setAttribute("aria-busy", String(isGenerating));
+  elements.boardLoading.hidden = !isGenerating;
+  elements.boardLoading.textContent = "正在生成确定性棋盘…";
+  delete elements.boardLoading.dataset.error;
+  elements.seedInput.disabled = isGenerating;
+  document.querySelectorAll("[data-dir], [data-select-robot], [data-action]").forEach((button) => {
+    button.disabled = isGenerating;
+  });
 }
 
 function transitionHistory(type) {
