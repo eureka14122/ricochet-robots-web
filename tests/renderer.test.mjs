@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { formatMove, formatSolution, targetGlyph } from "../src/renderer.mjs";
+import { formatMove, formatSolution, renderHistoryList, targetGlyph } from "../src/renderer.mjs";
 
 test("formats one move with Chinese robot and direction labels", () => {
   assert.equal(formatMove({ robot: "red", dir: "up", from: "2,2", to: "2,0" }), "红 上");
@@ -18,4 +18,24 @@ test("formats a full solution path", () => {
 
 test("returns a readable target glyph", () => {
   assert.equal(targetGlyph("star"), "★");
+});
+
+test("history renderer distinguishes completed and redo-pending moves", () => {
+  const makeNode = (tagName) => ({
+    tagName,
+    children: [],
+    append(...children) { this.children.push(...children); },
+  });
+  const list = {
+    ownerDocument: { createElement: makeNode },
+    replaceChildren(...children) { this.children = children; },
+  };
+  renderHistoryList(list, {
+    done: [{ robot: "red", dir: "up" }],
+    pending: [{ robot: "blue", dir: "right" }],
+  });
+  assert.equal(list.children.length, 2);
+  assert.equal(list.children[0].className, "history-done");
+  assert.equal(list.children[1].className, "history-pending");
+  assert.equal(list.children[1].children[1].textContent, "蓝 右");
 });

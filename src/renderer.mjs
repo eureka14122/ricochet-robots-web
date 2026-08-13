@@ -30,6 +30,7 @@ export function renderBoard(boardEl, { game, selectedRobot, solutionMoves = [] }
   const robotsByCell = new Map(Object.entries(game.robots).map(([robot, cell]) => [cell, robot]));
   const firstHint = solutionMoves[0] ?? null;
   const cells = [];
+  const documentObject = boardEl.ownerDocument;
 
   for (let y = 0; y < game.board.size; y += 1) {
     for (let x = 0; x < game.board.size; x += 1) {
@@ -47,45 +48,107 @@ export function renderBoard(boardEl, { game, selectedRobot, solutionMoves = [] }
       if (firstHint?.from === cell) classes.push("hint-from");
       if (firstHint?.to === cell) classes.push("hint-to");
 
-      cells.push(`<div class="${classes.join(" ")}" data-cell="${cell}">${renderTarget(isTarget, game.board.target)}${renderRobot(robot, selectedRobot)}</div>`);
+      const cellElement = documentObject.createElement("div");
+      cellElement.className = classes.join(" ");
+      cellElement.dataset.cell = cell;
+      if (isTarget) cellElement.append(createTargetElement(documentObject, game.board.target));
+      if (robot) cellElement.append(createRobotElement(documentObject, robot, selectedRobot));
+      cells.push(cellElement);
     }
   }
 
   boardEl.style.setProperty("--board-size", String(game.board.size));
-  boardEl.innerHTML = cells.join("");
+  boardEl.replaceChildren(...cells);
 }
 
 export function renderSolutionList(listEl, moves) {
-  listEl.innerHTML = moves.map((move, index) => {
+  const documentObject = listEl.ownerDocument;
+  const items = moves.map((move, index) => {
     const from = parseCell(move.from);
     const to = parseCell(move.to);
-    return `<li><span>${index + 1}</span><strong>${formatMove(move)}</strong><small>${from.x},${from.y} → ${to.x},${to.y}</small></li>`;
-  }).join("");
+    const item = documentObject.createElement("li");
+    const number = documentObject.createElement("span");
+    const label = documentObject.createElement("strong");
+    const detail = documentObject.createElement("small");
+    number.textContent = String(index + 1);
+    label.textContent = formatMove(move);
+    detail.textContent = `${from.x},${from.y} → ${to.x},${to.y}`;
+    item.append(number, label, detail);
+    return item;
+  });
+  listEl.replaceChildren(...items);
+}
+
+export function renderHistoryList(listEl, { done, pending }) {
+  const documentObject = listEl.ownerDocument;
+  const items = [];
+  const allMoves = [
+    ...done.map((move, index) => ({ move, index: index + 1, pending: false })),
+    ...pending.map((move, index) => ({ move, index: done.length + index + 1, pending: true })),
+  ];
+
+  if (!allMoves.length) {
+    const empty = documentObject.createElement("li");
+    empty.className = "history-empty";
+    empty.textContent = "落子后，轨迹会记录在这里。";
+    listEl.replaceChildren(empty);
+    return;
+  }
+
+  for (const { move, index, pending: isPending } of allMoves) {
+    const item = documentObject.createElement("li");
+    const number = documentObject.createElement("span");
+    const label = documentObject.createElement("strong");
+    item.className = isPending ? "history-pending" : "history-done";
+    number.textContent = String(index).padStart(2, "0");
+    label.textContent = formatMove(move);
+    item.append(number, label);
+    items.push(item);
+  }
+  listEl.replaceChildren(...items);
 }
 
 export function robotClass(robot) {
   return ROBOTS.includes(robot) ? `robot-${robot}` : "robot-unknown";
 }
 
-function renderTarget(isTarget, target) {
-  if (!isTarget) return "";
-  return `<span class="target-token" aria-label="目标">${targetGlyph(target.symbol)}</span>`;
+function createTargetElement(documentObject, target) {
+  const token = documentObject.createElement("span");
+  token.className = "target-token";
+  token.setAttribute("aria-label", `${ROBOT_LABELS[target.color]}色机器人目标`);
+  token.textContent = targetGlyph(target.symbol);
+  const index = documentObject.createElement("small");
+  index.textContent = String(ROBOTS.indexOf(target.color) + 1);
+  token.append(index);
+  return token;
 }
 
-function renderRobot(robot, selectedRobot) {
-  if (!robot) return "";
-  const selected = robot === selectedRobot ? " selected" : "";
+function createRobotElement(documentObject, robot, selectedRobot) {
+  const button = documentObject.createElement("button");
   const label = `${ROBOT_LABELS[robot] ?? robot}色机器人`;
-  return `<button class="robot-token ${robotClass(robot)}${selected}" data-robot="${robot}" type="button" aria-label="${label}">${robotSvg(robot)}</button>`;
+  button.className = `robot-token ${robotClass(robot)}${robot === selectedRobot ? " selected" : ""}`;
+  button.dataset.robot = robot;
+  button.type = "button";
+  button.setAttribute("aria-label", label);
+  button.setAttribute("aria-pressed", String(robot === selectedRobot));
+  button.append(createRobotSvg(documentObject, robot));
+  return button;
 }
 
-function robotSvg(robot) {
+function createRobotSvg(documentObject, robot) {
+  const namespace = "http://www.w3.org/2000/svg";
+  const svg = documentObject.createElementNS(namespace, "svg");
+  svg.setAttribute("viewBox", "0 0 42 42");
+  svg.setAttribute("aria-hidden", "true");
+  svg.setAttribute("focusable", "false");
   const face = robot === "yellow" ? "#212414" : "#ffffff";
-  return `<svg viewBox="0 0 42 42" aria-hidden="true" focusable="false">
-    <rect x="9" y="12" width="24" height="21" rx="6"></rect>
-    <rect x="14" y="6" width="14" height="9" rx="4"></rect>
-    <circle cx="17" cy="22" r="2.7" fill="${face}"></circle>
-    <circle cx="25" cy="22" r="2.7" fill="${face}"></circle>
-    <path d="M15 29h12" stroke="${face}" stroke-width="2.8" stroke-linecap="round"></path>
-  </svg>`;
+  const body = documentObject.createElementNS(namespace, "rect");
+  body.setAttribute("x", "8"); body.setAttribute("y", "11"); body.setAttribute("width", "26"); body.setAttribute("height", "23"); body.setAttribute("rx", "5");
+  const head = documentObject.createElementNS(namespace, "rect");
+  head.setAttribute("x", "14"); head.setAttribute("y", "6"); head.setAttribute("width", "14"); head.setAttribute("height", "8"); head.setAttribute("rx", "3");
+  const number = documentObject.createElementNS(namespace, "text");
+  number.setAttribute("x", "21"); number.setAttribute("y", "28"); number.setAttribute("text-anchor", "middle"); number.setAttribute("fill", face); number.setAttribute("font-size", "14"); number.setAttribute("font-weight", "800");
+  number.textContent = String(ROBOTS.indexOf(robot) + 1);
+  svg.append(body, head, number);
+  return svg;
 }

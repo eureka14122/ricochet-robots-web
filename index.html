@@ -3,19 +3,31 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>碰撞机器人练习版</title>
+    <meta name="theme-color" content="#f3efe6">
+    <title>碰撞机器人</title>
     <link rel="stylesheet" href="./styles.css">
   </head>
   <body>
     <main class="app-shell">
-      <section class="game-stage" aria-label="棋盘区域">
-        <div class="stage-header">
+      <header class="stage-header">
+        <div class="brand-lockup">
+          <svg class="brand-mark" viewBox="0 0 40 40" role="img" aria-label="四个机器人沿折线路径反弹的抽象标志">
+            <path d="M5 29h10V11h10v12h10" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="square" stroke-linejoin="miter"></path>
+            <circle cx="5" cy="29" r="3.5"></circle>
+            <circle cx="15" cy="11" r="3.5"></circle>
+            <circle cx="25" cy="23" r="3.5"></circle>
+            <circle class="brand-mark-accent" cx="35" cy="23" r="4.5"></circle>
+          </svg>
           <div>
-            <p class="eyebrow">Ricochet practice board</p>
-            <h1>碰撞机器人练习版</h1>
+            <h1>碰撞机器人</h1>
+            <p class="brand-subtitle">沿直线滑行，借障碍停靠。</p>
           </div>
-          <p class="keyboard-help">1-4 选机器人，WASD / 方向键移动，Z 撤销，H 提示，S 解法</p>
         </div>
+        <p class="keyboard-help">1–4 选机器人 · 方向键移动 · Ctrl/Cmd+Z 撤销 · Shift+Z / Y 重做 · R 重置</p>
+      </header>
+
+      <div class="play-layout">
+      <section class="game-stage" aria-label="棋盘区域">
         <div id="board" class="board" aria-label="16乘16碰撞机器人棋盘"></div>
       </section>
 
@@ -46,25 +58,50 @@
           </div>
         </section>
 
+        <section class="panel history-panel" aria-labelledby="historyTitle">
+          <div class="panel-heading-row">
+            <p id="historyTitle" class="panel-kicker">Steps / History</p>
+            <p id="historySummary" class="history-summary" aria-live="polite">等待第一步</p>
+          </div>
+          <ol id="historyList" class="history-list" aria-label="本局移动轨迹">
+            <li class="history-empty">落子后，轨迹会记录在这里。</li>
+          </ol>
+        </section>
+
         <section class="panel">
           <p class="panel-kicker">移动</p>
+          <div class="robot-picker" aria-label="选择机器人">
+            <button class="robot-choice choice-red" data-select-robot="red" type="button" aria-label="选择红色机器人">1<span>红</span></button>
+            <button class="robot-choice choice-blue" data-select-robot="blue" type="button" aria-label="选择蓝色机器人">2<span>蓝</span></button>
+            <button class="robot-choice choice-green" data-select-robot="green" type="button" aria-label="选择绿色机器人">3<span>绿</span></button>
+            <button class="robot-choice choice-yellow" data-select-robot="yellow" type="button" aria-label="选择黄色机器人">4<span>黄</span></button>
+          </div>
           <div class="direction-pad" aria-label="方向按钮">
-            <button class="direction-button up" data-dir="up" type="button">上</button>
-            <button class="direction-button left" data-dir="left" type="button">左</button>
-            <button class="direction-button right" data-dir="right" type="button">右</button>
-            <button class="direction-button down" data-dir="down" type="button">下</button>
+            <button class="direction-button up" data-dir="up" type="button" aria-label="向上移动当前机器人"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 11 6-6 6 6M12 5v14"></path></svg><span>上</span></button>
+            <button class="direction-button left" data-dir="left" type="button" aria-label="向左移动当前机器人"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m11 6-6 6 6 6M5 12h14"></path></svg><span>左</span></button>
+            <button class="direction-button right" data-dir="right" type="button" aria-label="向右移动当前机器人"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m13 6 6 6-6 6M19 12H5"></path></svg><span>右</span></button>
+            <button class="direction-button down" data-dir="down" type="button" aria-label="向下移动当前机器人"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 13 6 6 6-6M12 19V5"></path></svg><span>下</span></button>
           </div>
         </section>
 
-        <section class="panel actions-panel">
-          <button data-action="undo" type="button">撤销</button>
-          <button data-action="reset" type="button">重开</button>
-          <button data-action="new" type="button">新局</button>
+        <section class="panel tabletop-tools">
+          <p class="panel-kicker">对局工具</p>
+          <div class="history-actions">
+            <button data-action="undo" type="button" aria-label="撤销上一步" disabled><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 7 4 12l5 5M5 12h8a6 6 0 0 1 6 6"></path></svg>撤销</button>
+            <button data-action="redo" type="button" aria-label="重做下一步" disabled><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 7 5 5-5 5m4-5h-8a6 6 0 0 0-6 6"></path></svg>重做</button>
+            <button data-action="reset" type="button" aria-label="重置当前种子的对局" disabled>重置</button>
+            <button data-action="new" type="button" aria-label="生成一个新种子的对局">新局</button>
+            <button data-action="copy" type="button" aria-label="复制当前对局链接">复制链接</button>
+          </div>
+          <div class="seed-controls">
           <label class="seed-field">
             自定种子
-            <input id="seedInput" inputmode="numeric" type="text" placeholder="例如 1024">
+            <input id="seedInput" inputmode="numeric" type="text" maxlength="10" pattern="[0-9]*" autocomplete="off" aria-describedby="seedHelp" placeholder="例如 1024">
           </label>
-          <button data-action="seed" type="button">套用种子</button>
+            <button data-action="seed" type="button">载入</button>
+          </div>
+          <p id="seedHelp" class="seed-help">1–4294967295；链接只保存这个种子。</p>
+          <p id="copyStatus" class="copy-status" role="status" aria-live="polite"></p>
         </section>
 
         <section class="panel solver-panel">
@@ -77,11 +114,17 @@
           <ol id="solutionList" class="solution-list"></ol>
         </section>
       </aside>
+      </div>
     </main>
 
-    <div id="winOverlay" class="win-overlay" role="dialog" aria-modal="true" aria-labelledby="winTitle">
+    <div id="winOverlay" class="win-overlay" role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="winTitle">
       <div class="win-card">
-        <div class="win-badge" aria-hidden="true">🏆</div>
+        <div class="win-badge" aria-hidden="true">
+          <svg viewBox="0 0 40 40">
+            <path d="M5 29h10V11h10v12h10" fill="none" stroke="currentColor" stroke-width="2.5"></path>
+            <circle cx="5" cy="29" r="3.5"></circle><circle cx="15" cy="11" r="3.5"></circle><circle cx="25" cy="23" r="3.5"></circle><circle class="win-mark-accent" cx="35" cy="23" r="4.5"></circle>
+          </svg>
+        </div>
         <h2 id="winTitle">目标达成</h2>
         <p id="winSummary" class="win-summary"></p>
         <div class="win-actions">

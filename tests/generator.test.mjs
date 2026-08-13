@@ -12,6 +12,18 @@ test("same seed generates the same puzzle", () => {
   assert.equal(serializeBoard(first.board), serializeBoard(second.board));
   assert.equal(serializeRobots(first.robots), serializeRobots(second.robots));
   assert.deepEqual(first.board.target, second.board.target);
+  assert.equal(first.solutionDepth, second.solutionDepth);
+});
+
+test("different seeds produce valid distinct puzzles", () => {
+  const first = generatePuzzle(1024);
+  const second = generatePuzzle(20260413);
+  assert.notEqual(
+    `${serializeBoard(first.board)}|${serializeRobots(first.robots)}`,
+    `${serializeBoard(second.board)}|${serializeRobots(second.robots)}`,
+  );
+  assert.ok(first.solutionDepth >= 4 && first.solutionDepth <= 12);
+  assert.ok(second.solutionDepth >= 4 && second.solutionDepth <= 12);
 });
 
 test("generated puzzle is solvable with a default-length solution", () => {

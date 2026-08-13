@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { createGame, moveRobot, undoMove, hasWon } from "../src/engine.mjs";
+import { createGame, moveRobot, resetGame, hasWon } from "../src/engine.mjs";
 import { cellId, DIRECTIONS } from "../src/model.mjs";
 
 function makeBoard() {
@@ -132,7 +132,7 @@ test("createGame carries solutionDepth through to game state", () => {
   assert.equal(game.solutionDepth, 7);
 });
 
-test("undo restores the previous robot positions and move count", () => {
+test("reset restores the immutable initial robot positions", () => {
   const game = createGame({
     board: makeBoard(),
     robots: {
@@ -145,10 +145,9 @@ test("undo restores the previous robot positions and move count", () => {
   });
 
   const moved = moveRobot(game, "red", DIRECTIONS.down).game;
-  const undone = undoMove(moved);
+  const reset = resetGame(moved);
 
-  assert.equal(undone.robots.red, cellId(1, 0));
-  assert.equal(undone.moveCount, 0);
-  assert.equal(undone.history.length, 0);
-  assert.equal(undone.status, "playing");
+  assert.equal(reset.robots.red, cellId(1, 0));
+  assert.equal(reset.moveCount, 0);
+  assert.equal(reset.status, "playing");
 });

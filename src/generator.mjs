@@ -1,5 +1,6 @@
 import { solvePuzzle } from "./solver.mjs";
-import { cellId, makePrng, normalizeSeed, pick, ROBOTS } from "./model.mjs";
+import { cellId, makePrng, pick, ROBOTS } from "./model.mjs";
+import { normalizeSeed } from "./seed.mjs";
 
 const SIZE = 16;
 const BASE_WALLS_H = ["2,12", "8,9"];

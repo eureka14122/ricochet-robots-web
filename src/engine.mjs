@@ -11,10 +11,10 @@ export function createGame({ board, robots, seed, solutionDepth }) {
   const game = {
     board,
     robots: cloneRobots(robots),
+    initialRobots: cloneRobots(robots),
     seed,
     solutionDepth: solutionDepth ?? null,
     moveCount: 0,
-    history: [],
     status: "playing",
   };
   return hasWon(game) ? { ...game, status: "won" } : game;
@@ -81,7 +81,6 @@ export function moveRobot(game, robot, dir) {
     ...game,
     robots,
     moveCount: game.moveCount + 1,
-    history: [...game.history, move],
   };
   return {
     moved: true,
@@ -93,34 +92,10 @@ export function moveRobot(game, robot, dir) {
   };
 }
 
-export function undoMove(game) {
-  if (game.history.length === 0) {
-    return game;
-  }
-
-  const history = game.history.slice(0, -1);
-  const last = game.history.at(-1);
-  const robots = cloneRobots(game.robots);
-  robots[last.robot] = last.from;
-  return {
-    ...game,
-    robots,
-    history,
-    moveCount: Math.max(0, game.moveCount - 1),
-    status: "playing",
-  };
-}
-
 export function resetGame(game) {
-  let robots = cloneRobots(game.robots);
-  for (let i = game.history.length - 1; i >= 0; i -= 1) {
-    const move = game.history[i];
-    robots[move.robot] = move.from;
-  }
   return {
     ...game,
-    robots,
-    history: [],
+    robots: cloneRobots(game.initialRobots),
     moveCount: 0,
     status: "playing",
   };

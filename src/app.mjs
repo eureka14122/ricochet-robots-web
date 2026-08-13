@@ -1,18 +1,35 @@
-import { createGame, moveRobot, resetGame, undoMove } from "./engine.mjs";
+import { copyText } from "./clipboard.mjs";
 import { generatePuzzle } from "./generator.mjs";
-import { getKeyCommand } from "./input.mjs";
+import {
+  createGameHistory,
+  historyControls,
+  historyMoves,
+  reduceGameHistory,
+  restoreGameHistory,
+  serializeGameHistory,
+} from "./history.mjs";
+import { getKeyCommand, getSwipeDirection, isEditableTarget } from "./input.mjs";
 import { solvePuzzle } from "./solver.mjs";
 import {
   DIRECTION_LABELS,
   ROBOT_LABELS,
-  normalizeSeed,
 } from "./model.mjs";
+import {
+  createPuzzleUrl,
+  createRandomSeed,
+  parseSeed,
+  resolveSeedFromSearch,
+} from "./seed.mjs";
 import {
   formatMove,
   renderBoard,
+  renderHistoryList,
   renderSolutionList,
   targetGlyph,
 } from "./renderer.mjs";
+
+const SESSION_KEY = "ricochet-robots-session-v1";
+const MAX_SESSION_LENGTH = 64_000;
 
 const elements = {
   board: document.querySelector("#board"),
@@ -27,37 +44,69 @@ const elements = {
   solutionList: document.querySelector("#solutionList"),
   winOverlay: document.querySelector("#winOverlay"),
   winSummary: document.querySelector("#winSummary"),
+  copyStatus: document.querySelector("#copyStatus"),
+  undoButton: document.querySelector('[data-action="undo"]'),
+  redoButton: document.querySelector('[data-action="redo"]'),
+  resetButton: document.querySelector('[data-action="reset"]'),
+  historySummary: document.querySelector("#historySummary"),
+  historyList: document.querySelector("#historyList"),
 };
 
 const state = {
-  game: null,
-  selectedRobot: "red",
+  timeline: null,
   solver: { status: "idle", mode: "hint", moves: [] },
   worker: createWorker(),
   requestId: 0,
 };
 
-startPuzzle(Date.now());
 wireControls();
+startFromLocation({ restoreSession: true });
 
-function startPuzzle(seedInput) {
-  const seed = normalizeSeed(seedInput);
+function startFromLocation({ restoreSession = false } = {}) {
+  const fallback = createRandomSeed(state.timeline?.game.seed);
+  const resolved = resolveSeedFromSearch(window.location.search, fallback);
+  startPuzzle(resolved.seed, {
+    urlMode: resolved.needsCanonicalUrl ? "replace" : "none",
+    restoreSession,
+  });
+  if (!resolved.fromUrl) announce("链接中的种子无效或缺失，已安全生成新局。", "notice");
+}
+
+function startPuzzle(seed, { urlMode = "push", restoreSession = false } = {}) {
   const puzzle = generatePuzzle(seed);
-  state.game = createGame(puzzle);
-  state.selectedRobot = puzzle.board.target.color;
+  state.timeline = restoreSession
+    ? restoreGameHistory(puzzle, readStoredHistory(seed)) ?? createGameHistory(puzzle)
+    : createGameHistory(puzzle);
   state.solver = { status: "idle", mode: "hint", moves: [] };
   state.requestId += 1;
   elements.seedInput.value = String(seed);
   dismissWin();
+  if (urlMode !== "none") {
+    const url = createPuzzleUrl(window.location.href, seed);
+    window.history[urlMode === "replace" ? "replaceState" : "pushState"]({ seed }, "", url);
+  }
   render();
 }
 
 function wireControls() {
   elements.board.addEventListener("click", (event) => {
+    if (elements.board.dataset.suppressClick === "true") {
+      delete elements.board.dataset.suppressClick;
+      return;
+    }
     const robotButton = event.target.closest("[data-robot]");
     if (!robotButton) return;
-    state.selectedRobot = robotButton.dataset.robot;
+    state.timeline = reduceGameHistory(state.timeline, { type: "select", robot: robotButton.dataset.robot });
     render();
+  });
+
+  wireBoardGestures();
+
+  document.querySelectorAll("[data-select-robot]").forEach((button) => {
+    button.addEventListener("click", () => {
+      state.timeline = reduceGameHistory(state.timeline, { type: "select", robot: button.dataset.selectRobot });
+      render();
+    });
   });
 
   document.querySelectorAll("[data-dir]").forEach((button) => {
@@ -65,14 +114,20 @@ function wireControls() {
   });
 
   document.querySelectorAll("[data-action]").forEach((button) => {
-    button.addEventListener("click", () => handleAction(button.dataset.action));
+    button.addEventListener("click", () => void handleAction(button.dataset.action));
   });
 
   document.addEventListener("keydown", (event) => {
-    if (event.target instanceof HTMLInputElement) return;
-    const handled = handleKey(event.key);
+    if (isEditableTarget(event.target)) return;
+    const handled = handleKey(event);
     if (handled) event.preventDefault();
   });
+
+  elements.seedInput.addEventListener("keydown", (event) => {
+    if (event.key === "Enter") void handleAction("seed");
+  });
+
+  window.addEventListener("popstate", () => startFromLocation());
 
   elements.winOverlay?.addEventListener("click", (event) => {
     if (event.target === elements.winOverlay || event.target.closest("[data-win-close]")) {
@@ -81,10 +136,46 @@ function wireControls() {
   });
 }
 
-function handleKey(key) {
-  const command = getKeyCommand(key);
+function wireBoardGestures() {
+  let gesture = null;
+  elements.board.addEventListener("pointerdown", (event) => {
+    if (event.pointerType === "mouse" || event.isPrimary === false) return;
+    gesture = {
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+      startedAt: performance.now(),
+      robot: event.target.closest?.("[data-robot]")?.dataset.robot ?? null,
+    };
+    elements.board.setPointerCapture?.(event.pointerId);
+  });
+
+  elements.board.addEventListener("pointerup", (event) => {
+    if (!gesture || event.pointerId !== gesture.pointerId) return;
+    const dir = getSwipeDirection({
+      startX: gesture.startX,
+      startY: gesture.startY,
+      endX: event.clientX,
+      endY: event.clientY,
+      durationMs: performance.now() - gesture.startedAt,
+    });
+    const robot = gesture.robot;
+    gesture = null;
+    if (!dir) return;
+    elements.board.dataset.suppressClick = "true";
+    if (robot) state.timeline = reduceGameHistory(state.timeline, { type: "select", robot });
+    play(dir);
+  });
+
+  elements.board.addEventListener("pointercancel", () => {
+    gesture = null;
+  });
+}
+
+function handleKey(event) {
+  const command = getKeyCommand(event);
   if (command.type === "select") {
-    state.selectedRobot = command.robot;
+    state.timeline = reduceGameHistory(state.timeline, { type: "select", robot: command.robot });
     render();
     return true;
   }
@@ -93,31 +184,40 @@ function handleKey(key) {
     return true;
   }
   if (command.type === "action") {
-    handleAction(command.action);
+    void handleAction(command.action);
     return true;
   }
   return false;
 }
 
-function handleAction(action) {
-  if (action === "undo") {
-    state.game = undoMove(state.game);
+async function handleAction(action) {
+  if (action === "undo" || action === "redo") {
+    transitionHistory(action);
     clearSolution();
-    render();
     return;
   }
   if (action === "reset") {
-    state.game = resetGame(state.game);
+    transitionHistory("reset");
     clearSolution();
-    render();
     return;
   }
   if (action === "new") {
-    startPuzzle(Date.now());
+    startPuzzle(createRandomSeed(state.timeline.game.seed));
     return;
   }
   if (action === "seed") {
-    startPuzzle(elements.seedInput.value);
+    const seed = parseSeed(elements.seedInput.value);
+    if (seed === null) {
+      announce("种子需为 1–4294967295 的十进制整数，当前对局未改变。", "error");
+      return;
+    }
+    startPuzzle(seed);
+    return;
+  }
+  if (action === "copy") {
+    const url = createPuzzleUrl(window.location.href, state.timeline.game.seed).href;
+    const copied = await copyText(url);
+    announce(copied ? "对局链接已复制。" : "复制失败，请手动复制地址栏中的链接。", copied ? "success" : "error");
     return;
   }
   if (action === "hint") {
@@ -130,20 +230,31 @@ function handleAction(action) {
 }
 
 function play(dir) {
-  if (state.game.status === "won") {
+  const game = state.timeline.game;
+  if (game.status === "won") {
     return;
   }
-  const result = moveRobot(state.game, state.selectedRobot, dir);
-  if (!result.moved) {
-    elements.statusText.textContent = `${ROBOT_LABELS[state.selectedRobot]}色机器人向${DIRECTION_LABELS[dir]}没有可移动空间。`;
+  const previous = state.timeline;
+  state.timeline = reduceGameHistory(previous, { type: "move", dir });
+  if (state.timeline === previous) {
+    elements.statusText.textContent = `${ROBOT_LABELS[state.timeline.selectedRobot]}色机器人向${DIRECTION_LABELS[dir]}没有可移动空间。`;
     return;
   }
-  state.game = result.game;
   clearSolution();
   render();
-  if (state.game.status === "won") {
+  if (state.timeline.game.status === "won") {
     celebrateWin();
   }
+}
+
+function transitionHistory(type) {
+  const previous = state.timeline;
+  const next = reduceGameHistory(previous, { type });
+  if (next === previous) return;
+  state.timeline = next;
+  if (previous.game.status === "won" && next.game.status !== "won") dismissWin();
+  render();
+  if (previous.game.status !== "won" && next.game.status === "won") celebrateWin();
 }
 
 function clearSolution() {
@@ -159,8 +270,8 @@ function requestSolution(mode) {
 
   const payload = {
     id,
-    board: state.game.board,
-    robots: state.game.robots,
+    board: state.timeline.game.board,
+    robots: state.timeline.game.robots,
     options: { maxDepth: 12, maxStates: 100_000 },
   };
 
@@ -193,6 +304,7 @@ function createWorker() {
     const worker = new Worker(new URL("./solver.worker.mjs", import.meta.url), { type: "module" });
     worker.addEventListener("message", (event) => {
       if (event.data.error) {
+        if (event.data.id !== state.requestId) return;
         state.solver = { status: "error", mode: state.solver.mode, moves: [], error: event.data.error };
         render();
         return;
@@ -211,28 +323,46 @@ function createWorker() {
 }
 
 function render() {
+  const game = state.timeline.game;
   const solutionMoves = state.solver.status === "solved" ? state.solver.moves : [];
   const previous = captureRobotRects();
   renderBoard(elements.board, {
-    game: state.game,
-    selectedRobot: state.selectedRobot,
+    game,
+    selectedRobot: state.timeline.selectedRobot,
     solutionMoves,
   });
   playSlideAnimation(previous);
 
-  const target = state.game.board.target;
-  const par = state.game.solutionDepth;
+  const target = game.board.target;
+  const par = game.solutionDepth;
   elements.targetBadge.textContent = targetGlyph(target.symbol);
   elements.targetBadge.className = `target-badge badge-${target.color}`;
   elements.targetText.textContent = `${ROBOT_LABELS[target.color]}色机器人到达目标`;
-  elements.moveCount.textContent = par ? `${state.game.moveCount} / ${par}` : String(state.game.moveCount);
-  elements.seedText.textContent = String(state.game.seed);
-  elements.selectedText.textContent = ROBOT_LABELS[state.selectedRobot];
-  elements.statusText.textContent = state.game.status === "won"
-    ? winMessage(state.game.moveCount, par)
+  elements.moveCount.textContent = par ? `${game.moveCount} / ${par}` : String(game.moveCount);
+  elements.seedText.textContent = String(game.seed);
+  elements.selectedText.textContent = ROBOT_LABELS[state.timeline.selectedRobot];
+  document.querySelectorAll("[data-select-robot]").forEach((button) => {
+    button.setAttribute("aria-pressed", String(button.dataset.selectRobot === state.timeline.selectedRobot));
+  });
+  elements.statusText.textContent = game.status === "won"
+    ? winMessage(game.moveCount, par)
     : par
       ? `选择机器人，让它沿直线滑到障碍前。最优 ${par} 步。`
       : "选择机器人，然后让它沿直线滑到障碍前。";
+
+  const controls = historyControls(state.timeline);
+  elements.undoButton.disabled = !controls.canUndo;
+  elements.redoButton.disabled = !controls.canRedo;
+  elements.resetButton.disabled = !controls.canReset;
+
+  const moves = historyMoves(state.timeline);
+  elements.historySummary.textContent = moves.pending.length
+    ? `${moves.done.length} 步已走 · ${moves.pending.length} 步待重做`
+    : moves.done.length
+      ? `${moves.done.length} 步已走`
+      : "等待第一步";
+  renderHistoryList(elements.historyList, moves);
+  storeHistory(state.timeline);
 
   renderSolverPanel();
 }
@@ -254,6 +384,7 @@ function playSlideAnimation(previous) {
     const dx = before.left - after.left;
     const dy = before.top - after.top;
     if (Math.abs(dx) < 1 && Math.abs(dy) < 1) return;
+    if (typeof node.animate !== "function") return;
     node.animate(
       [
         { transform: `translate(${dx}px, ${dy}px)` },
@@ -277,18 +408,44 @@ function winMessage(steps, par) {
 function celebrateWin() {
   const overlay = elements.winOverlay;
   if (!overlay) return;
-  const par = state.game.solutionDepth;
-  const steps = state.game.moveCount;
+  const par = state.timeline.game.solutionDepth;
+  const steps = state.timeline.game.moveCount;
   elements.winSummary.textContent = winMessage(steps, par);
   overlay.classList.add("show");
+  overlay.setAttribute("aria-hidden", "false");
 }
 
 function dismissWin() {
   elements.winOverlay?.classList.remove("show");
+  elements.winOverlay?.setAttribute("aria-hidden", "true");
+}
+
+function announce(message, tone) {
+  elements.copyStatus.textContent = message;
+  elements.copyStatus.dataset.tone = tone;
+}
+
+function readStoredHistory(seed) {
+  try {
+    const raw = window.sessionStorage?.getItem(SESSION_KEY);
+    if (!raw || raw.length > MAX_SESSION_LENGTH) return null;
+    const stored = JSON.parse(raw);
+    return stored?.seed === seed ? stored : null;
+  } catch {
+    return null;
+  }
+}
+
+function storeHistory(timeline) {
+  try {
+    window.sessionStorage?.setItem(SESSION_KEY, JSON.stringify(serializeGameHistory(timeline)));
+  } catch {
+    // Storage may be unavailable in private or hardened browsing modes.
+  }
 }
 
 function renderSolverPanel() {
-  elements.solutionList.innerHTML = "";
+  elements.solutionList.replaceChildren();
 
   if (state.solver.status === "idle") {
     elements.solverStatus.textContent = "还没有计算。";

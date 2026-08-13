@@ -97,7 +97,3 @@ export function makePrng(seed) {
 export function pick(prng, items) {
   return items[Math.floor(prng() * items.length)];
 }
-
-export function normalizeSeed(seed = Date.now()) {
-  return Math.abs(Number.parseInt(String(seed), 10) || 1) >>> 0;
-}
