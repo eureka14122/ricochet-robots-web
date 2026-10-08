@@ -1,4 +1,5 @@
 import { copyText } from "./clipboard.mjs";
+import { getHistoryPage, HISTORY_PAGE_SIZE } from "./history-window.mjs";
 import { generatePuzzle } from "./generator.mjs";
 import {
   createGameHistory,
@@ -50,6 +51,8 @@ const elements = {
   resetButton: document.querySelector('[data-action="reset"]'),
   historySummary: document.querySelector("#historySummary"),
   historyList: document.querySelector("#historyList"),
+  historyPageLabel: document.querySelector("#historyPageLabel"),
+  historyPageButtons: [...document.querySelectorAll("[data-history-page]")],
   boardLoading: document.querySelector("#boardLoading"),
 };
 
@@ -61,6 +64,7 @@ const state = {
   generator: null,
   generationId: 0,
   generating: false,
+  historyPage: null,
 };
 
 wireControls();
@@ -80,6 +84,7 @@ function startPuzzle(seed, { urlMode = "push", restoreSession = false } = {}) {
   const id = state.generationId + 1;
   state.generationId = id;
   state.generating = true;
+  state.historyPage = null;
   state.solver = { status: "idle", mode: "hint", moves: [] };
   state.requestId += 1;
   elements.seedInput.value = String(seed);
@@ -119,6 +124,24 @@ function wireControls() {
   });
 
   wireBoardGestures();
+
+  // The history is paginated so hundreds of moves cannot grow the UI.
+  elements.historyPageButtons.forEach((button) => {
+    button.addEventListener("click", () => {
+      if (state.generating || !state.timeline) return;
+      const moves = historyMoves(state.timeline);
+      const view = getHistoryPage(moves.done.length + moves.pending.length, moves.done.length, state.historyPage);
+      const command = button.dataset.historyPage;
+      if (command === "current") state.historyPage = null;
+      if (command === "previous") state.historyPage = Math.max(0, view.page - 1);
+      if (command === "next") state.historyPage = Math.min(view.pageCount - 1, view.page + 1);
+      render();
+    });
+  });
+  elements.historyList.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-history-step]");
+    if (button && !state.generating) seekHistoryStep(Number(button.dataset.historyStep));
+  });
 
   document.querySelectorAll("[data-select-robot]").forEach((button) => {
     button.addEventListener("click", () => {
@@ -181,6 +204,8 @@ function wireBoardGestures() {
     gesture = null;
     if (!dir) return;
     elements.board.dataset.suppressClick = "true";
+    // A swipe may not create a click: never suppress a later real tap.
+    window.setTimeout(() => { delete elements.board.dataset.suppressClick; }, 0);
     if (robot) state.timeline = reduceGameHistory(state.timeline, { type: "select", robot });
     play(dir);
   });
@@ -263,6 +288,7 @@ function play(dir) {
     return;
   }
   clearSolution();
+  state.historyPage = null;
   render();
   if (state.timeline.game.status === "won") {
     celebrateWin();
@@ -327,9 +353,27 @@ function transitionHistory(type) {
   const next = reduceGameHistory(previous, { type });
   if (next === previous) return;
   state.timeline = next;
+  state.historyPage = null;
   if (previous.game.status === "won" && next.game.status !== "won") dismissWin();
   render();
   if (previous.game.status !== "won" && next.game.status === "won") celebrateWin();
+}
+
+function seekHistoryStep(step) {
+  if (!state.timeline || !Number.isInteger(step)) return;
+  const total = state.timeline.past.length + state.timeline.future.length;
+  if (step < 0 || step > total) return;
+  const before = state.timeline.game.status;
+  let next = state.timeline;
+  while (next.past.length > step) next = reduceGameHistory(next, { type: "undo" });
+  while (next.past.length < step) next = reduceGameHistory(next, { type: "redo" });
+  if (next === state.timeline) return;
+  state.timeline = next;
+  state.historyPage = Math.floor(Math.max(0, step - 1) / HISTORY_PAGE_SIZE);
+  clearSolution();
+  if (before === "won" && next.game.status !== "won") dismissWin();
+  render();
+  if (before !== "won" && next.game.status === "won") celebrateWin();
 }
 
 function clearSolution() {
@@ -436,7 +480,15 @@ function render() {
     : moves.done.length
       ? `${moves.done.length} 步已走`
       : "等待第一步";
-  renderHistoryList(elements.historyList, moves);
+  const view = getHistoryPage(moves.done.length + moves.pending.length, moves.done.length, state.historyPage);
+  renderHistoryList(elements.historyList, moves, { start: view.start, limit: HISTORY_PAGE_SIZE });
+  elements.historyPageLabel.textContent = `${view.page + 1} / ${view.pageCount}`;
+  for (const button of elements.historyPageButtons) {
+    const action = button.dataset.historyPage;
+    button.disabled = action === "previous" ? !view.canPrevious
+      : action === "next" ? !view.canNext
+        : state.historyPage === null;
+  }
   storeHistory(state.timeline);
 
   renderSolverPanel();
