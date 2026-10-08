@@ -25,6 +25,8 @@ test("history renderer distinguishes completed and redo-pending moves", () => {
     tagName,
     children: [],
     append(...children) { this.children.push(...children); },
+    setAttribute(key, value) { this[key] = value; },
+    dataset: {},
   });
   const list = {
     ownerDocument: { createElement: makeNode },
@@ -37,5 +39,28 @@ test("history renderer distinguishes completed and redo-pending moves", () => {
   assert.equal(list.children.length, 2);
   assert.equal(list.children[0].className, "history-done");
   assert.equal(list.children[1].className, "history-pending");
-  assert.equal(list.children[1].children[1].textContent, "蓝 右");
+  assert.equal(list.children[1].children[0].children[1].textContent, "蓝 右");
+  assert.equal(list.children[1].children[0].dataset.historyStep, "2");
+});
+
+test("large histories render only the requested page without losing move numbers", () => {
+  const makeNode = (tagName) => ({
+    tagName, dataset: {}, children: [],
+    append(...items) { this.children.push(...items); },
+    setAttribute(key, value) { this[key] = value; },
+  });
+  const list = {
+    ownerDocument: { createElement: makeNode },
+    replaceChildren(...children) { this.children = children; },
+  };
+  const makeMove = (robot) => ({ robot, dir: "up", from: "0,0", to: "0,1" });
+  renderHistoryList(list, {
+    done: Array.from({ length: 235 }, () => makeMove("red")),
+    pending: Array.from({ length: 265 }, () => makeMove("blue")),
+  }, { start: 228, limit: 15 });
+  assert.equal(list.children.length, 15);
+  assert.equal(list.children[0].children[0].dataset.historyStep, "229");
+  assert.equal(list.children[14].children[0].dataset.historyStep, "243");
+  assert.equal(list.children[0].className, "history-done");
+  assert.equal(list.children[14].className, "history-pending");
 });
