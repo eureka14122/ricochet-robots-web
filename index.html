@@ -32,6 +32,7 @@
       <section class="game-stage" aria-label="棋盘区域">
         <div id="board" class="board" aria-label="16乘16碰撞机器人棋盘" aria-busy="true"></div>
         <div id="boardLoading" class="board-loading" role="status" aria-live="polite">正在生成确定性棋盘…</div>
+        <p class="mobile-board-help">轻触机器人选择 · 在棋盘上滑动，让机器人一滑到底</p>
       </section>
 
       <aside class="side-panel" aria-label="控制面板">
@@ -61,23 +62,6 @@
           </div>
         </section>
 
-        <section class="panel history-panel" aria-labelledby="historyTitle">
-          <div class="panel-heading-row">
-            <p id="historyTitle" class="panel-kicker">Steps / History</p>
-            <p id="historySummary" class="history-summary" aria-live="polite">等待第一步</p>
-          </div>
-          <ol id="historyList" class="history-list" aria-label="本局移动轨迹，点击一步可回到该状态">
-            <li class="history-empty">落子后，轨迹会记录在这里。</li>
-          </ol>
-          <div class="history-pagination" aria-label="历史记录分页">
-            <button data-history-page="previous" type="button" aria-label="上一页历史记录" disabled>← 较早</button>
-            <span id="historyPageLabel" aria-live="polite">1 / 1</span>
-            <button data-history-page="next" type="button" aria-label="下一页历史记录" disabled>较新 →</button>
-            <button data-history-page="current" type="button" aria-label="回到当前进度" disabled>当前步 ↗</button>
-          </div>
-          <p class="history-tip">点击任一步，可直接回退或重做到该状态。</p>
-        </section>
-
         <section class="panel">
           <p class="panel-kicker">移动</p>
           <p class="control-hint">先选颜色，再滑行到下一面墙或机器人。</p>
@@ -93,6 +77,23 @@
             <button class="direction-button right" data-dir="right" type="button" aria-label="向右移动当前机器人"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m13 6 6 6-6 6M19 12H5"></path></svg><span>右</span></button>
             <button class="direction-button down" data-dir="down" type="button" aria-label="向下移动当前机器人"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 13 6 6 6-6M12 19V5"></path></svg><span>下</span></button>
           </div>
+        </section>
+
+        <section class="panel history-panel" aria-labelledby="historyTitle">
+          <div class="panel-heading-row">
+            <p id="historyTitle" class="panel-kicker">Steps / History</p>
+            <p id="historySummary" class="history-summary" aria-live="polite">等待第一步</p>
+          </div>
+          <ol id="historyList" class="history-list" aria-label="本局移动轨迹，点击一步可回到该状态">
+            <li class="history-empty">落子后，轨迹会记录在这里。</li>
+          </ol>
+          <div class="history-pagination" aria-label="历史记录分页">
+            <button data-history-page="previous" type="button" aria-label="上一页历史记录" disabled>← 较早</button>
+            <span id="historyPageLabel" aria-live="polite">1 / 1</span>
+            <button data-history-page="next" type="button" aria-label="下一页历史记录" disabled>较新 →</button>
+            <button data-history-page="current" type="button" aria-label="回到当前进度" disabled>当前步 ↗</button>
+          </div>
+          <p class="history-tip">点击任一步，可直接回退或重做到该状态。</p>
         </section>
 
         <section class="panel tabletop-tools">
