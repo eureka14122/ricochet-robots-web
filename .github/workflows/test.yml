@@ -18,3 +18,15 @@ jobs:
           node-version: "22"
       - name: Run regression suite
         run: npm test
+      - name: Install browser driver
+        run: npm install --no-save --no-package-lock playwright@1.56.1
+      - name: Run responsive browser smoke tests
+        run: node tests/browser-smoke.mjs
+      - name: Upload screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ricochet-ui-screenshots
+          path: artifacts/*.png
+          retention-days: 3
+          if-no-files-found: ignore
