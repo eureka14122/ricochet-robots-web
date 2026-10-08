@@ -79,15 +79,18 @@ export function renderSolutionList(listEl, moves) {
   listEl.replaceChildren(...items);
 }
 
-export function renderHistoryList(listEl, { done, pending }) {
+/**
+ * Renders only the requested history window, rather than adding one DOM node
+ * for every move. The complete timeline remains in the game state.
+ */
+export function renderHistoryList(listEl, { done, pending }, { start = 0, limit = Number.MAX_SAFE_INTEGER } = {}) {
   const documentObject = listEl.ownerDocument;
+  const total = done.length + pending.length;
+  const offset = Math.max(0, Math.min(total, Math.trunc(start) || 0));
+  const end = Math.min(total, offset + Math.max(0, Math.trunc(limit) || 0));
   const items = [];
-  const allMoves = [
-    ...done.map((move, index) => ({ move, index: index + 1, pending: false })),
-    ...pending.map((move, index) => ({ move, index: done.length + index + 1, pending: true })),
-  ];
 
-  if (!allMoves.length) {
+  if (!total) {
     const empty = documentObject.createElement("li");
     empty.className = "history-empty";
     empty.textContent = "落子后，轨迹会记录在这里。";
@@ -95,14 +98,22 @@ export function renderHistoryList(listEl, { done, pending }) {
     return;
   }
 
-  for (const { move, index, pending: isPending } of allMoves) {
+  for (let index = offset; index < end; index += 1) {
+    const isPending = index >= done.length;
+    const move = isPending ? pending[index - done.length] : done[index];
     const item = documentObject.createElement("li");
+    const button = documentObject.createElement("button");
     const number = documentObject.createElement("span");
     const label = documentObject.createElement("strong");
     item.className = isPending ? "history-pending" : "history-done";
-    number.textContent = String(index).padStart(2, "0");
+    button.type = "button";
+    button.dataset.historyStep = String(index + 1);
+    button.setAttribute("aria-label", `跳转到第 ${index + 1} 步：${formatMove(move)}`);
+    if (index + 1 === done.length) button.setAttribute("aria-current", "step");
+    number.textContent = String(index + 1).padStart(2, "0");
     label.textContent = formatMove(move);
-    item.append(number, label);
+    button.append(number, label);
+    item.append(button);
     items.push(item);
   }
   listEl.replaceChildren(...items);
