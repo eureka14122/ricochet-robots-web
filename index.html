@@ -3,9 +3,10 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="theme-color" content="#f3efe6">
+    <meta name="theme-color" content="#0b1321">
     <title>碰撞机器人</title>
     <link rel="stylesheet" href="./styles.css">
+    <link rel="stylesheet" href="./ui-refinement.css">
   </head>
   <body>
     <main class="app-shell">
@@ -19,11 +20,12 @@
             <circle class="brand-mark-accent" cx="35" cy="23" r="4.5"></circle>
           </svg>
           <div>
+            <p class="brand-eyebrow">RICOCHET / STRATEGY LAB</p>
             <h1>碰撞机器人</h1>
             <p class="brand-subtitle">沿直线滑行，借障碍停靠。</p>
           </div>
         </div>
-        <p class="keyboard-help">1–4 选机器人 · 方向键移动 · Ctrl/Cmd+Z 撤销 · Shift+Z / Y 重做 · R 重置</p>
+        <div class="header-meta"><span class="header-status"><span aria-hidden="true">●</span> 16 × 16 / 滑行策略</span><p class="keyboard-help">1–4 选机器人 · 方向键 / WASD 移动<br>Ctrl/Cmd+Z 撤销 · Shift+Z / Y 重做 · R 重置</p></div>
       </header>
 
       <div class="play-layout">
@@ -64,13 +66,21 @@
             <p id="historyTitle" class="panel-kicker">Steps / History</p>
             <p id="historySummary" class="history-summary" aria-live="polite">等待第一步</p>
           </div>
-          <ol id="historyList" class="history-list" aria-label="本局移动轨迹">
+          <ol id="historyList" class="history-list" aria-label="本局移动轨迹，点击一步可回到该状态">
             <li class="history-empty">落子后，轨迹会记录在这里。</li>
           </ol>
+          <div class="history-pagination" aria-label="历史记录分页">
+            <button data-history-page="previous" type="button" aria-label="上一页历史记录" disabled>← 较早</button>
+            <span id="historyPageLabel" aria-live="polite">1 / 1</span>
+            <button data-history-page="next" type="button" aria-label="下一页历史记录" disabled>较新 →</button>
+            <button data-history-page="current" type="button" aria-label="回到当前进度" disabled>当前步 ↗</button>
+          </div>
+          <p class="history-tip">点击任一步，可直接回退或重做到该状态。</p>
         </section>
 
         <section class="panel">
           <p class="panel-kicker">移动</p>
+          <p class="control-hint">先选颜色，再滑行到下一面墙或机器人。</p>
           <div class="robot-picker" aria-label="选择机器人">
             <button class="robot-choice choice-red" data-select-robot="red" type="button" aria-label="选择红色机器人">1<span>红</span></button>
             <button class="robot-choice choice-blue" data-select-robot="blue" type="button" aria-label="选择蓝色机器人">2<span>蓝</span></button>
