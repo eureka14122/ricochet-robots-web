@@ -91,6 +91,8 @@ h1 {
 
 .play-layout {
   min-width: 0;
+  max-width: 1100px;
+  margin: 0 auto;
   grid-template-columns: minmax(0, 1fr) minmax(0, 352px);
   gap: 24px;
   align-items: start;
