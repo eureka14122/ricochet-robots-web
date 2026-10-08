@@ -202,7 +202,15 @@ function wireBoardGestures() {
     });
     const robot = gesture.robot;
     gesture = null;
-    if (!dir) return;
+    if (!dir) {
+      // Pointer capture can retarget the synthetic click to the board.
+      // Select on pointerup as well so a touchscreen tap always works.
+      if (robot && state.timeline && !state.generating) {
+        state.timeline = reduceGameHistory(state.timeline, { type: "select", robot });
+        render();
+      }
+      return;
+    }
     elements.board.dataset.suppressClick = "true";
     // A swipe may not create a click: never suppress a later real tap.
     window.setTimeout(() => { delete elements.board.dataset.suppressClick; }, 0);
@@ -343,7 +351,7 @@ function setGenerating(isGenerating) {
   elements.boardLoading.textContent = "正在生成确定性棋盘…";
   delete elements.boardLoading.dataset.error;
   elements.seedInput.disabled = isGenerating;
-  document.querySelectorAll("[data-dir], [data-select-robot], [data-action]").forEach((button) => {
+  document.querySelectorAll("[data-dir], [data-select-robot], [data-action], [data-history-page]").forEach((button) => {
     button.disabled = isGenerating;
   });
 }
