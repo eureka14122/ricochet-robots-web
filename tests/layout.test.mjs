@@ -43,3 +43,14 @@ test("board renderer builds trusted DOM nodes instead of injecting HTML", () => 
   assert.doesNotMatch(renderer, /\.innerHTML\s*=/);
   assert.match(renderer, /replaceChildren/);
 });
+
+test("refined UI explicitly contains history and step counters", () => {
+  const skin = readFileSync(new URL("../ui-refinement.css", import.meta.url), "utf8");
+  assert.match(skin, /\.side-panel\s*\{[\s\S]*?min-width:\s*0/);
+  assert.match(skin, /\.panel,\s*\n?\.panel:first-child\s*\{[\s\S]*?min-width:\s*0/);
+  assert.match(skin, /\.history-list\s*\{[\s\S]*?grid-template-columns:\s*repeat\(3,\s*minmax\(0,\s*1fr\)\)/);
+  assert.match(skin, /\.stats-panel strong\s*\{[\s\S]*?overflow-wrap:\s*anywhere/);
+  assert.match(html, /data-history-page="previous"/);
+  assert.match(html, /data-history-page="next"/);
+  assert.match(html, /data-history-page="current"/);
+});
