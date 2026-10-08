@@ -138,3 +138,23 @@ test("invalid or tampered stored history is rejected", () => {
   assert.equal(restoreGameHistory(puzzle, { ...stored, seed: 88 }), null);
   assert.equal(restoreGameHistory(puzzle, { ...stored, past: [{ robot: "red", dir: "sideways", from: "0,0", to: "0,3" }] }), null);
 });
+
+test("hundreds of moves retain undo/redo and session restoration", () => {
+  const puzzle = makePuzzle();
+  let state = createGameHistory(puzzle);
+  state = reduceGameHistory(state, { type: "select", robot: "blue" });
+  for (let index = 0; index < 300; index += 1) {
+    state = reduceGameHistory(state, { type: "move", dir: index % 2 === 0 ? "up" : "down" });
+  }
+  assert.equal(state.game.moveCount, 300);
+  assert.equal(historyMoves(state).done.length, 300);
+  const restored = restoreGameHistory(puzzle, serializeGameHistory(state));
+  assert.ok(restored);
+  assert.equal(restored.game.moveCount, 300);
+  for (let i = 0; i < 155; i += 1) state = reduceGameHistory(state, { type: "undo" });
+  assert.equal(state.game.moveCount, 145);
+  assert.equal(historyMoves(state).pending.length, 155);
+  for (let i = 0; i < 155; i += 1) state = reduceGameHistory(state, { type: "redo" });
+  assert.equal(state.game.moveCount, 300);
+  assert.deepEqual(state.game.robots, restored.game.robots);
+});
