@@ -1,0 +1,41 @@
+name: Publish Ricochet UI
+
+on:
+  push:
+    branches:
+      - feat/ui-history-overflow-fix
+    paths:
+      - ".github/workflows/pages-preview.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: ricochet-pages-release
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - name: Checkout UI branch
+        uses: actions/checkout@v4
+      - name: Prepare site
+        run: |
+          mkdir -p public
+          cp index.html styles.css ui-refinement.css .nojekyll public/
+          cp -R src public/src
+          test -f public/index.html
+      - name: Upload site artifact
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: public
+      - name: Deploy to existing GitHub Pages
+        id: deploy
+        uses: actions/deploy-pages@v4
