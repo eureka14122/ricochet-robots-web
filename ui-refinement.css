@@ -491,3 +491,21 @@ input:focus-visible,
   .history-list { grid-template-columns: repeat(2,minmax(0,1fr)); }
   .history-pagination { justify-content: space-between; }
 }
+
+/* Primary game interaction stays near the board, especially on touch screens. */
+.mobile-board-help { display: none; }
+@media (max-width: 960px) {
+  .game-stage { flex-direction: column; align-items: center; }
+  .mobile-board-help {
+    display: block;
+    align-self: stretch;
+    text-align: center;
+    margin: 13px 0 0;
+    padding: 10px 12px;
+    border: 1px solid rgba(136, 218, 194, .23);
+    border-radius: 10px;
+    color: #b0dfd5;
+    background: rgba(25, 66, 69, .22);
+    font: 710 11px/1.5 var(--utility);
+  }
+}
